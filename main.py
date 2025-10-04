@@ -40,14 +40,14 @@ def draw_grid(ax, nrows, ncols):
 	ax.set_xlim(x_m, x_M)
 	ax.set_ylim(y_m, y_M)
 
-def get_train_tasks():
+def get_train_task_ids():
 	"""
-	return the list of the name of all training tasks
+	return the list of the names of all training tasks
 	"""
 	return np.loadtxt("data/training.txt", dtype=str).tolist()
 
 class Task:
-	"""
+	r"""
 	pass
 	
 	Parameters
@@ -61,10 +61,14 @@ class Task:
 		identifier of the task
 	nb_examples : int
 		nb of examples available for the task
-	data: dict
+	data : dict
 		data of the task
-	type_ : int
-		Gives some hint about the nature of the task.
+	type_ : {0, 1, 2, 3}
+		Gives some hint about the nature of the task:
+		- 0: the input and output are of same sizes
+		- 1: the output is larger than the input in every dimension
+		- 2: the output is smaller than the input in every dimension
+		- 3: other
 	"""
 	def __init__(self,
 		task_id
@@ -80,11 +84,28 @@ class Task:
 		with open('data/training/' + task_id + '.json') as json_data:
 			data = load(json_data)
 		return data
-	
+
 	def _get_prop(self):
 		nb_examples = len(self.data['train'])
 		nb_questions = len(self.data['test'])
-		task_type = 0
+		
+		# list the sizes for each example
+		in_sizes = []
+		out_sizes = []
+		for example in self.data['train']:
+			in_sizes += [*np.shape(example['input'])]
+			out_sizes += [*np.shape(example['output'])]
+
+		in_sizes = np.array(in_sizes)
+		out_sizes = np.array(out_sizes)
+		task_type = 3
+		if (in_sizes == out_sizes).all():
+			task_type = 0
+		elif (in_sizes < out_sizes).all():
+			task_type = 1
+		elif (in_sizes > out_sizes).all():
+			task_type = 2
+		return nb_examples, nb_questions, task_type
 
 	def display(self):
 		"""
@@ -94,6 +115,9 @@ class Task:
 
 task_id = '9344f635'
 task = Task(task_id)
+print(task.nb_examples)
+print(task.nb_questions)
+print(task.type_)
 
 if __name__ == "__main__":
 	pass
