@@ -25,24 +25,16 @@ if ((Test-Admin) -eq $false)  {
 }
 'running with full privileges'
 
+<#
+create the custom module implementing the powershell commands for Git management
+first check whether the module already exists
+#>
 # name of the custom module
 $custom_module = "GitTools"
 
-# create the folder containing the custom scripts
+# path to the folder containing the custom scripts
 $script_path = "$env:ProgramFiles\WindowsPowerShell\Modules\$custom_module"
-New-Item -ItemType "Directory" -Path $script_path
 
-# move there the file implementing the custom functions
-Move-Item -Path "$working_dir\$custom_module.psm1" -Destination "$script_path\$custom_module.psm1"
-
-# add in the same folder the manifest for the created module,
-$moduleManifestParams = @{
-    Path = "$script_path\$custom_module.psd1"
-    RootModule = $custom_module
-    Author = 'Didier Le Bail'
-    Description = 'a handful of commands to ease pushing, creating, renaming and switching branches when working on a Git repository'
-    CompanyName = 'None'
-	FunctionsToExport = 'Switch-git', 'Start-git', 'Push-git', 'Rename-git'
+if (!(Test-Path -Path $script_path)) {
+    & "$working_dir\create_module.ps1" $custom_module $script_path $working_dir
 }
-
-New-ModuleManifest @moduleManifestParams

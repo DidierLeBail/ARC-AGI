@@ -22,24 +22,34 @@ function Rename-git {
     & git push $remote -u $new_name
 }
 
-# return the path to $project_root
 function Get-root {
-    param (
-        [Parameter(Mandatory=$false)][string]$project_root="ARC-AGI"
-    )
-    $list_paths=(& Get-Location).Path.Split('\')
+    <# get higher in the folder hierarchy until a .git directory is found #>
 
-    # find the index in list_paths at which we get the project root
-    # and determine its absolute path
-    $index = 0
-    $root_path = ""
-    while (!($list_paths[$index] -eq $project_root)) {
-        $root_path = $root_path, $list_paths[$index] -join "\"
-        $index = $index + 1
+    $initial_location = & Get-Location
+
+    $current_dir = $initial_location
+    $condition = & Test-Path -Path "$current_dir\`.git"
+
+    while (!($condition)) {
+        $current_dir = & Split-Path -Parent $current_dir
+
+        # check whether we are not getting too high in the folder hierarchy
+        if ($current_dir -eq $env:HOMEDRIVE) {
+            $condition = $false
+            
+            # restore the original location before exiting
+            Set-Location -Path $initial_location
+            throw "got too high in the folder hierarchy: open your shell below your project's root"
+        } else {
+            $condition = & Test-Path -Path "$current_dir\`.git"
+        }
     }
+    $root_dir = $current_dir
 
-    $root_path = $root_path, $project_root -join "\"
-    return $root_path.TrimStart("\")
+    # restore the original location
+    Set-Location -Path $initial_location
+
+    return $root_dir
 }
 
 # push local changes to remote
@@ -50,8 +60,8 @@ function Push-git {
     )
     $current_branch = & git rev-parse --abbrev-ref HEAD
 
-    # push local changes upstream
-    & git add ../*
+    # push (all) local changes upstream
+    & git add -A
     & git commit -m $commit_msg
     & git push $remote $current_branch
 }
