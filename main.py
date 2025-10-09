@@ -25,6 +25,7 @@ Only exact solutions (all cells match the expected answer) can be said to be cor
 
 import numpy as np
 from json import load
+from typing import List
 
 import matplotlib.pyplot as plt
 
@@ -34,13 +35,24 @@ def draw_grid(ax, nrows, ncols):
 	xs = np.linspace(x_m, x_M, ncols + 1)
 	ys = np.linspace(y_m, y_M, nrows + 1)
 	for x in xs:
-		ax.plot([x]*2, [y_m, y_M], color='gray')
+		ax.plot([x]*2, [y_m, y_M], color='white')
 	for y in ys:
-		ax.plot([x_m, x_M], [y]*2, color='gray')
+		ax.plot([x_m, x_M], [y]*2, color='white')
 	ax.set_xlim(x_m, x_M)
 	ax.set_ylim(y_m, y_M)
 
-def get_train_task_ids():
+def draw_int_mat(ax, mat, colors):
+	nrows = len(mat)
+	ncols = len(mat[0])
+	ax.set_xlim(0, ncols)
+	ax.set_ylim(0, nrows)
+
+	for i, row in enumerate(mat):
+		for j, val in enumerate(row):
+			ax.axvspan(xmin=j, xmax=j+1, ymin=1-i/nrows, ymax=1-(i+1)/nrows, color=colors[val])
+	draw_grid(ax, nrows, ncols)
+
+def get_train_task_ids() -> List[str]:
 	"""
 	return the list of the names of all training tasks
 	"""
@@ -52,12 +64,12 @@ class Task:
 	
 	Parameters
 	----------
-	task_id : int
+	task_id : str
 		identifier of the task
 
 	Attributes
 	----------
-	id_ : int
+	id_ : str
 		identifier of the task
 	nb_examples : int
 		nb of examples available for the task
@@ -70,8 +82,11 @@ class Task:
 		- 2: the output is smaller than the input in every dimension
 		- 3: other
 	"""
+	
+	COLORS = ['black', 'blue', 'red', 'green', 'yellow', 'gray', 'magenta', 'orange', 'cyan', 'brown']
+	
 	def __init__(self,
-		task_id
+		task_id:str
 	):
 		self.id_ = task_id
 		self.data = self._load()
@@ -81,7 +96,7 @@ class Task:
 		r"""
 		Return the data of the training task of id *self.id_*.
 		"""
-		with open('data/training/' + task_id + '.json') as json_data:
+		with open('data/training/' + self.id_ + '.json') as json_data:
 			data = load(json_data)
 		return data
 
@@ -101,23 +116,76 @@ class Task:
 		task_type = 3
 		if (in_sizes == out_sizes).all():
 			task_type = 0
-		elif (in_sizes < out_sizes).all():
+		elif (in_sizes <= out_sizes).all():
 			task_type = 1
-		elif (in_sizes > out_sizes).all():
+		elif (in_sizes >= out_sizes).all():
 			task_type = 2
 		return nb_examples, nb_questions, task_type
 
 	def display(self):
 		"""
-		Displays the annotated data of the task.
+		Displays the pairs of examples (input, output).
+		The inputs are displayed at the top and the outputs at the bottom.
 		"""
-		pass
+		fig, axs = plt.subplots(nrows=2, ncols=self.nb_examples, constrained_layout=True)
+		fig.suptitle(self.id_)
+		for ax in axs.flatten():
+			plt.setp(ax.get_xticklabels(), visible=False)
+			plt.setp(ax.get_yticklabels(), visible=False)
+			ax.tick_params(axis='both', which='both', length=0)
+			ax.set_aspect('equal')
+		axs[0, 0].set_ylabel("input")
+		axs[1, 0].set_ylabel("output")
+		
+		for col, pair in enumerate(self.data["train"]):
+			for row, key in enumerate(["input", "output"]):
+				draw_int_mat(
+					axs[row, col],
+					pair[key],
+					Task.COLORS
+				)
 
-task_id = '9344f635'
+		plt.show()
+
+class Histo(dict):
+	"""
+	pass
+	"""
+	def __init__(self, *args, **kwargs):
+		dict.__init__(self, *args, **kwargs)
+	
+	def add_sample(self, value:int):
+		if value in self:
+			self[value] += 1
+		else:
+			self[value] = 1
+
+strange_tasks = ['8abad3cf', 'd631b094', 'e6de6e8f', 'c803e39c', 'd5c634a2', '42f83767', '652646ff', '4852f2fa', 'b1986d4b']
+task_id = 'b1986d4b' #'9344f635'
 task = Task(task_id)
 print(task.nb_examples)
 print(task.nb_questions)
 print(task.type_)
+task.display()
+exit()
 
 if __name__ == "__main__":
-	pass
+	all_tasks = {task_id: Task(task_id) for task_id in get_train_task_ids()}
+	attrs = ["nb_examples", "nb_questions", "type_"]
+	stats = {attr: Histo() for attr in attrs}
+	
+	for task in all_tasks.values():
+		for attr in attrs:
+			stats[attr].add_sample(getattr(task, attr))
+
+	print(stats)
+	print()
+
+	strange_task_ids = []
+	for task_id, task in all_tasks.items():
+		if task.type_ == 3:
+			strange_task_ids.append(task_id)
+	
+	print(strange_task_ids)
+	for task_id in strange_task_ids:
+		all_tasks[task_id].display()
